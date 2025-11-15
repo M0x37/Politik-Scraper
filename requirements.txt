@@ -1,5 +1,11 @@
+<<<<<<< HEAD
 requests==2.32.5
 feedparser==6.0.12
 beautifulsoup4==4.14.2
 lxml==6.0.2
 python-dotenv==1.0.0
+=======
+requests
+beautifulsoup4
+python-telegram-bot
+>>>>>>> 5d5a50c5b375233dbc8a67c08fee31137aefb5ae
