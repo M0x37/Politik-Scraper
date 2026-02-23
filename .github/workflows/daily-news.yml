@@ -32,14 +32,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Check Secrets
-      id: check_secrets
+    - name: Direct Send Test
+      id: direct_test
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
         cd src
-        python check_secrets.py
+        python direct_send_test.py
         
     - name: Run news scraper
       id: scraper
@@ -67,6 +67,7 @@ jobs:
       with:
         name: debug-data-${{ github.run_number }}
         path: |
+          src/direct_send_result.json
           src/secrets_check.json
           src/telegram_test_result.json
           src/daily_news.json
