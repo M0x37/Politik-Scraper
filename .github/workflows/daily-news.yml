@@ -32,14 +32,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Simple Telegram Test
-      id: simple_test
+    - name: Check Secrets
+      id: check_secrets
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
         cd src
-        python simple_telegram_test.py
+        python check_secrets.py
         
     - name: Run news scraper
       id: scraper
@@ -62,12 +62,15 @@ jobs:
         cd src
         python debug_telegram.py
         
-    - name: Upload news data
+    - name: Upload debug data
       uses: actions/upload-artifact@v4
       with:
-        name: daily-news-${{ github.run_number }}
-        path: src/daily_news.json
-        retention-days: 30
+        name: debug-data-${{ github.run_number }}
+        path: |
+          src/secrets_check.json
+          src/telegram_test_result.json
+          src/daily_news.json
+        retention-days: 7
         
     - name: Create summary
       run: |
