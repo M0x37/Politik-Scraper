@@ -1,30 +1,69 @@
-name: Daily Politics News
+name: Daily News Scraper
 
 on:
   schedule:
-    - cron: '0 18 * * *'
-  workflow_dispatch:
+    # Täglich um 20:00 Berliner Zeit (19:00 UTC)
+    - cron: '0 19 * * *'
+  workflow_dispatch: # Erlaubt manuelle Ausführung
 
 jobs:
-  send-news:
+  scrape-news:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout Code
+    - name: Checkout repository
       uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v5
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
       with:
-        python-version: '3.12'
-    
-    - name: Install Dependencies
+        python-version: '3.11'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    
-    - name: Run News Scraper
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: python src/main.py
+        
+    - name: Run news scraper
+      id: scraper
+      run: |
+        cd src
+        python telegram_bot.py > telegram_output.txt 2>&1
+        echo "telegram_output<<EOF" >> $GITHUB_OUTPUT
+        cat telegram_output.txt >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Upload news data
+      uses: actions/upload-artifact@v3
+      with:
+        name: daily-news-${{ github.run_number }}
+        path: src/daily_news.json
+        retention-days: 30
+        
+    - name: Create summary
+      run: |
+        if [ -f "src/daily_news.json" ]; then
+          echo "## 📰 Tagesnachrichten" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          import json
+          with open('src/daily_news.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          print(f'**Datum:** {data[\"date\"][:10]}')
+          print(f'**Anzahl Nachrichten:** {data[\"news_count\"]}')
+          print('')
+          for i, news in enumerate(data['news'], 1):
+              print(f'### {i}. {news[\"title\"]}')
+              print(f'{news[\"summary\"]}')
+              print(f'*Quelle: {news[\"source\"]}*')
+              print('')
+          " >> $GITHUB_STEP_SUMMARY
+        fi
