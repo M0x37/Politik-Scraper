@@ -34,6 +34,9 @@ jobs:
         
     - name: Run news scraper
       id: scraper
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
         cd src
         python telegram_bot.py > telegram_output.txt 2>&1
