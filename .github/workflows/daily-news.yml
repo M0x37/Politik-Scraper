@@ -38,8 +38,7 @@ jobs:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
-        cd src
-        python telegram_bot.py > telegram_output.txt 2>&1 || echo "Script failed" >> telegram_output.txt
+        python "Telegram Bot/telegram_bot.py" > telegram_output.txt 2>&1 || echo "Script failed" >> telegram_output.txt
         echo "telegram_output<<EOF" >> $GITHUB_OUTPUT
         cat telegram_output.txt >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
@@ -57,13 +56,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: daily-news-${{ github.run_number }}
-        path: src/daily_news.json
+        path: daily_news.json
         retention-days: 30
         
     - name: Create summary
       run: |
-        if [ -f "src/daily_news.json" ]; then
+        if [ -f "daily_news.json" ]; then
           echo "## 📰 Tagesnachrichten" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          python -c "import json; data = json.load(open('src/daily_news.json', 'r', encoding='utf-8')); print(f'**Datum:** {data[\"date\"][:10]}'); print(f'**Anzahl Nachrichten:** {data[\"news_count\"]}'); print(''); [print(f'### {i}. {news[\"title\"]}\n{news[\"summary\"]}\n*Quelle: {news[\"source\"]}*\n') for i, news in enumerate(data['news'], 1)]" >> $GITHUB_STEP_SUMMARY
+          python -c "import json; data = json.load(open('daily_news.json', 'r', encoding='utf-8')); print(f'**Datum:** {data[\"date\"][:10]}'); print(f'**Anzahl Nachrichten:** {data[\"news_count\"]}'); print(''); [print(f'### {i}. {news[\"title\"]}\n{news[\"summary\"]}\n*Quelle: {news[\"source\"]}*\n') for i, news in enumerate(data['news'], 1)]" >> $GITHUB_STEP_SUMMARY
         fi
