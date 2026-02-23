@@ -291,17 +291,27 @@ def main():
     bot = NewsTelegramBot(bot_token, chat_id)
     
     try:
-        success = bot.send_news_to_telegram()
-        
-        # Optional: Als JSON speichern
+        # Nachrichten holen (unabhängig vom Senden)
         news = bot.get_daily_news(5)
+        
+        # Immer JSON erstellen
         output_data = {
             'date': datetime.now().isoformat(),
             'news_count': len(news),
-            'news': news,
-            'telegram_sent': success
+            'news': news
         }
         
+        with open('daily_news.json', 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"JSON-Datei erstellt mit {len(news)} Nachrichten")
+        
+        # Nur senden wenn Token und Chat ID vorhanden
+        success = bot.send_news_to_telegram()
+        
+        output_data['telegram_sent'] = success
+        
+        # JSON aktualisieren mit Sendestatus
         with open('daily_news.json', 'w', encoding='utf-8') as f:
             json.dump(output_data, f, ensure_ascii=False, indent=2)
         
@@ -309,6 +319,16 @@ def main():
         
     except Exception as e:
         logger.error(f"Fehler bei der Bot-Ausführung: {e}")
+        # Auch bei Fehler JSON erstellen
+        error_data = {
+            'date': datetime.now().isoformat(),
+            'news_count': 0,
+            'news': [],
+            'telegram_sent': False,
+            'error': str(e)
+        }
+        with open('daily_news.json', 'w', encoding='utf-8') as f:
+            json.dump(error_data, f, ensure_ascii=False, indent=2)
         raise
 
 if __name__ == "__main__":
