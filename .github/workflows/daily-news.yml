@@ -39,10 +39,19 @@ jobs:
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
         cd src
-        python telegram_bot.py > telegram_output.txt 2>&1
+        python telegram_bot.py > telegram_output.txt 2>&1 || echo "Script failed" >> telegram_output.txt
         echo "telegram_output<<EOF" >> $GITHUB_OUTPUT
         cat telegram_output.txt >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Debug Telegram connection
+      if: failure()
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        cd src
+        python debug_telegram.py
         
     - name: Upload news data
       uses: actions/upload-artifact@v4
