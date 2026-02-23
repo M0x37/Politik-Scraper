@@ -28,6 +28,23 @@
                         <i class="fas fa-spinner fa-spin"></i>
                         <p>Lade Nachrichten...</p>
                     </div>
+                    <script>
+                        const newsHTML = data.news.map((news, index) => `
+                            <div class="news-item">
+                                <div class="news-content">
+                                    <h3 class="news-title">${this.escapeHtml(news.title)}</h3>
+                                    <p class="news-summary">${this.escapeHtml(news.summary)}</p>
+                                </div>
+                                <div class="news-actions">
+                                    <button class="copy-btn" onclick="newsWebsite.copyNews(${index})" title="Kopieren">
+                                        <i class="fas fa-copy"></i>
+                                        <span>Kopieren</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('');
+                        document.getElementById('newsContainer').innerHTML = newsHTML;
+                    </script>
                 </div>
             </div>
 

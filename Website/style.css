@@ -105,11 +105,8 @@ main {
     border-color: #667eea;
 }
 
-.news-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 10px;
+.news-content {
+    margin-bottom: 15px;
 }
 
 .news-title {
@@ -117,8 +114,20 @@ main {
     font-weight: 600;
     color: #2c3e50;
     line-height: 1.4;
-    flex: 1;
-    margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+.news-summary {
+    color: #555;
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+.news-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
 }
 
 .copy-btn {
@@ -126,14 +135,15 @@ main {
     color: white;
     border: none;
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 10px 16px;
     cursor: pointer;
     font-size: 0.9rem;
+    font-weight: 500;
     transition: all 0.3s ease;
     white-space: nowrap;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
 }
 
 .copy-btn:hover {
@@ -156,36 +166,6 @@ main {
     border-radius: 5px;
     font-size: 0.8rem;
     white-space: nowrap;
-}
-
-.news-summary {
-    color: #555;
-    font-size: 1rem;
-    line-height: 1.5;
-    margin-bottom: 10px;
-}
-
-.news-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.9rem;
-    color: #7f8c8d;
-}
-
-.news-source {
-    background: #e3f2fd;
-    color: #0984e3;
-    padding: 4px 8px;
-    border-radius: 5px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
-.news-time {
-    display: flex;
-    align-items: center;
-    gap: 5px;
 }
 
 .info-section {

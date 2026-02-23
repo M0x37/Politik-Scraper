@@ -140,7 +140,7 @@ class NewsWebsite {
         }
 
         const news = this.newsData.news[index];
-        const copyText = `${news.title}\n\n${news.summary}\n\nQuelle: ${news.source}`;
+        const copyText = `${news.title}\n\n${news.summary}`;
         
         // Versuche moderne Clipboard API
         if (navigator.clipboard && window.isSecureContext) {
