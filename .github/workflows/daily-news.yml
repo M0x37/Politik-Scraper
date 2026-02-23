@@ -32,6 +32,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
+    - name: Simple Telegram Test
+      id: simple_test
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        cd src
+        python simple_telegram_test.py
+        
     - name: Run news scraper
       id: scraper
       env:
