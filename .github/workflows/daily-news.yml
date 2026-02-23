@@ -42,7 +42,7 @@ jobs:
         echo "EOF" >> $GITHUB_OUTPUT
         
     - name: Upload news data
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: daily-news-${{ github.run_number }}
         path: src/daily_news.json
