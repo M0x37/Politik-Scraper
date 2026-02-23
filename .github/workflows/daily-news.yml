@@ -32,15 +32,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Direct Send Test
-      id: direct_test
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        cd src
-        python direct_send_test.py
-        
     - name: Run news scraper
       id: scraper
       env:
@@ -62,16 +53,12 @@ jobs:
         cd src
         python debug_telegram.py
         
-    - name: Upload debug data
+    - name: Upload news data
       uses: actions/upload-artifact@v4
       with:
-        name: debug-data-${{ github.run_number }}
-        path: |
-          src/direct_send_result.json
-          src/secrets_check.json
-          src/telegram_test_result.json
-          src/daily_news.json
-        retention-days: 7
+        name: daily-news-${{ github.run_number }}
+        path: src/daily_news.json
+        retention-days: 30
         
     - name: Create summary
       run: |
