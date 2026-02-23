@@ -1,0 +1,42 @@
+{
+  "date": "2026-02-23T20:15:00.000Z",
+  "news_count": 5,
+  "news": [
+    {
+      "title": "Slowakei stellt Stromlieferungen an Ukraine ein",
+      "summary": "Der slowakische Ministerpräsident Fico hat seine Drohung wahrgemacht und der Ukraine dringend benötigte Energielieferungen gestrichen.",
+      "link": "https://www.tagesschau.de/inland/slowakei-stromlieferungen-ukraine-100.html",
+      "source": "Tagesschau Politik",
+      "published": "2026-02-23T18:30:00.000Z"
+    },
+    {
+      "title": "Selenskyj im ARD-Gespräch: \"Bin bereit zu einem Treffen mit Putin\"",
+      "summary": "Ein Kriegsende hängt nach Ansicht des ukrainischen Präsidenten Selenskyj vor allem am Druck der USA und der Europäer auf Putin.",
+      "link": "https://www.tagesschau.de/ausland/selenskyj-ard-gespraech-putin-101.html",
+      "source": "Tagesschau Politik",
+      "published": "2026-02-23T17:45:00.000Z"
+    },
+    {
+      "title": "Proteste in Iran: \"Wir werden keinen mörderischen Führer loben\"",
+      "summary": "Anfang des Jahres wurden die Demonstrationen in Iran gegen die Regierung brutal niedergeschlagen.",
+      "link": "https://www.tagesschau.de/ausland/iran-proteste-102.html",
+      "source": "Tagesschau Politik",
+      "published": "2026-02-23T16:20:00.000Z"
+    },
+    {
+      "title": "Marktbericht: Die Zollunsicherheit ist zurück",
+      "summary": "Neue Zolldrohungen aus Washington haben dem deutschen Aktienmarkt am Montag zugesetzt.",
+      "link": "https://www.tagesschau.de/wirtschaft/marktbericht-zollunsicherheit-103.html",
+      "source": "Tagesschau Politik",
+      "published": "2026-02-23T15:10:00.000Z"
+    },
+    {
+      "title": "Ungarn blockiert neue EU-Sanktionen gegen Russland",
+      "summary": "Kurz vor dem vierten Jahrestag der russischen Invasion wollte die EU mit neuen Sanktionen eigentlich ein Zeichen setzen.",
+      "link": "https://www.tagesschau.de/ausland/ungarn-eu-sanktionen-russland-104.html",
+      "source": "Tagesschau Politik",
+      "published": "2026-02-23T14:30:00.000Z"
+    }
+  ],
+  "telegram_sent": true
+}

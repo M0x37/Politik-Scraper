@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Politik News Bot</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-newspaper"></i> Politik News Bot</h1>
+            <p class="subtitle">Tägliche politische Nachrichten direkt in deinem Telegram</p>
+        </header>
+
+        <main>
+            <div class="news-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-clock"></i> Aktuelle Nachrichten</h2>
+                    <button id="refreshBtn" class="btn btn-primary">
+                        <i class="fas fa-sync-alt"></i> Aktualisieren
+                    </button>
+                </div>
+                
+                <div id="newsContainer" class="news-container">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Lade Nachrichten...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <div class="info-card">
+                    <h3><i class="fas fa-info-circle"></i> Über diesen Bot</h3>
+                    <p>Dieser Bot sendet täglich um 20:00 Berliner Zeit die 5 wichtigsten politischen Nachrichten aus vertrauenswürdigen Quellen.</p>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Tagesschau</li>
+                        <li><i class="fas fa-check"></i> n-tv Politik</li>
+                        <li><i class="fas fa-check"></i> ZDF Politik</li>
+                        <li><i class="fas fa-check"></i> Deutsche Welle</li>
+                        <li><i class="fas fa-check"></i> ARD</li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-cog"></i> Bot einrichten</h3>
+                    <p>Um den Bot zu nutzen:</p>
+                    <ol>
+                        <li>Telegram Bot erstellen (@BotFather)</li>
+                        <li>Bot starten und Chat ID ermitteln</li>
+                        <li>Bot Token und Chat ID konfigurieren</li>
+                    </ol>
+                    <p><a href="https://github.com/M0x37/Politik-Scraper" target="_blank" class="btn btn-secondary">
+                        <i class="fab fa-github"></i> GitHub Repository
+                    </a></p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Politik News Bot. Automatisierte Nachrichten aus vertrauenswürdigen Quellen.</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
