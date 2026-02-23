@@ -264,16 +264,30 @@ class NewsTelegramBot:
             # Nachricht formatieren
             message = self.format_telegram_message(news)
             
-            # An Telegram senden
-            bot = Bot(token=self.bot_token)
-            bot.send_message(
-                chat_id=self.chat_id,
-                text=message,
-                parse_mode='Markdown'
-            )
+            # Direkte API-Anfrage statt Bibliothek
+            import requests
             
-            logger.info("Nachrichten erfolgreich an Telegram gesendet")
-            return True
+            url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            
+            data = {
+                'chat_id': self.chat_id,
+                'text': message,
+                'parse_mode': 'Markdown'
+            }
+            
+            response = requests.post(url, json=data, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.info("Nachrichten erfolgreich an Telegram gesendet")
+                    return True
+                else:
+                    logger.error(f"API Error: {result.get('description')}")
+                    return False
+            else:
+                logger.error(f"HTTP Error: {response.status_code} - {response.text}")
+                return False
             
         except Exception as e:
             logger.error(f"Fehler beim Senden an Telegram: {e}")
