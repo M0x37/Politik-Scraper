@@ -77,17 +77,5 @@ jobs:
         if [ -f "src/daily_news.json" ]; then
           echo "## 📰 Tagesnachrichten" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          python -c "
-          import json
-          with open('src/daily_news.json', 'r', encoding='utf-8') as f:
-              data = json.load(f)
-          print(f'**Datum:** {data[\"date\"][:10]}')
-          print(f'**Anzahl Nachrichten:** {data[\"news_count\"]}')
-          print('')
-          for i, news in enumerate(data['news'], 1):
-              print(f'### {i}. {news[\"title\"]}')
-              print(f'{news[\"summary\"]}')
-              print(f'*Quelle: {news[\"source\"]}*')
-              print('')
-          " >> $GITHUB_STEP_SUMMARY
+          python -c "import json; data = json.load(open('src/daily_news.json', 'r', encoding='utf-8')); print(f'**Datum:** {data[\"date\"][:10]}'); print(f'**Anzahl Nachrichten:** {data[\"news_count\"]}'); print(''); [print(f'### {i}. {news[\"title\"]}\n{news[\"summary\"]}\n*Quelle: {news[\"source\"]}*\n') for i, news in enumerate(data['news'], 1)]" >> $GITHUB_STEP_SUMMARY
         fi
