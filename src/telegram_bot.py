@@ -13,7 +13,7 @@ import os
 from typing import List, Dict
 import logging
 import telegram
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram import Bot
 
 # Logging konfigurieren
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -265,7 +265,7 @@ class NewsTelegramBot:
             message = self.format_telegram_message(news)
             
             # An Telegram senden
-            bot = telegram.Bot(token=self.bot_token)
+            bot = Bot(token=self.bot_token)
             bot.send_message(
                 chat_id=self.chat_id,
                 text=message,
