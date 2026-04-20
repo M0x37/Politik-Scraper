@@ -14,6 +14,8 @@ from typing import List, Dict
 import logging
 import telegram
 from telegram import Bot
+import urllib.parse
+import webbrowser
 
 # Logging konfigurieren
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -243,15 +245,25 @@ class NewsTelegramBot:
     def format_telegram_message(self, news_items: List[Dict]) -> str:
         """Formatiert Nachrichten für Telegram"""
         if not news_items:
-            return "📰 Keine politischen Nachrichten gefunden."
+            return " Keine politischen Nachrichten gefunden."
         
-        message = f"📰 *Tagesnachrichten vom {datetime.now().strftime('%d.%m.%Y')}*\n\n"
+        message = f" *Tagesnachrichten vom {datetime.now().strftime('%d.%m.%Y')}*\n\n"
         
         for i, news in enumerate(news_items, 1):
             message += f"*{i}. {news['title']}*\n"
             message += f"{news['summary']}\n\n"
         
         return message
+    
+    def open_in_converter(self, text: str) -> None:
+        """Öffnet den Text im Handschrift Converter"""
+        try:
+            encoded = urllib.parse.quote(text)
+            converter_url = f"https://sozi-zeta.vercel.app/?text={encoded}"
+            logger.info(f"Öffne Converter: {converter_url}")
+            webbrowser.open(converter_url)
+        except Exception as e:
+            logger.warning(f"Konnte Converter nicht öffnen: {e}")
     
     def send_news_to_telegram(self) -> bool:
         """Sendet tägliche Nachrichten an Telegram"""
@@ -319,6 +331,12 @@ def main():
             json.dump(output_data, f, ensure_ascii=False, indent=2)
         
         logger.info(f"JSON-Datei erstellt mit {len(news)} Nachrichten")
+        
+        # Nachricht formatieren für Telegram UND Converter
+        message = bot.format_telegram_message(news)
+        
+        # Im Converter öffnen
+        bot.open_in_converter(message)
         
         # Nur senden wenn Token und Chat ID vorhanden
         success = bot.send_news_to_telegram()
