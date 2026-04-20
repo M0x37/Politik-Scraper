@@ -309,12 +309,11 @@ def main():
     """Hauptfunktion"""
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    
+
     if not bot_token or not chat_id:
-        logger.error("TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID Umgebungsvariablen müssen gesetzt sein")
-        return
-    
-    bot = NewsTelegramBot(bot_token, chat_id)
+        logger.warning("TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID nicht gesetzt - nur Converter wird geöffnet")
+
+    bot = NewsTelegramBot(bot_token or '', chat_id or '')
     
     try:
         # Nachrichten holen (unabhängig vom Senden)
@@ -338,8 +337,12 @@ def main():
         # Im Converter öffnen
         bot.open_in_converter(message)
         
-        # Nur senden wenn Token und Chat ID vorhanden
-        success = bot.send_news_to_telegram()
+        # Nur an Telegram senden wenn Token und Chat ID vorhanden
+        success = False
+        if bot_token and chat_id:
+            success = bot.send_news_to_telegram()
+        else:
+            logger.info("Telegram Senden übersprungen (keine Credentials)")
         
         output_data['telegram_sent'] = success
         
