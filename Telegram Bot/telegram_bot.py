@@ -346,7 +346,7 @@ class NewsTelegramBot:
         return text
 
     def format_telegram_message(self, news_items: List[Dict]) -> str:
-        """Formatiert Nachrichten für Telegram (verbessertes Layout)"""
+        """Formatiert Nachrichten für Telegram (ohne Quellenangabe)"""
         if not news_items:
             return "*Keine politischen Nachrichten gefunden.*"
 
@@ -357,21 +357,14 @@ class NewsTelegramBot:
         for i, news in enumerate(news_items, 1):
             title = self._escape_markdown(news.get('title', '').strip())
             summary = self._escape_markdown(news.get('summary', '').strip())
-            source = self._escape_markdown(news.get('source', '').strip())
             link = news.get('link', '').strip()
 
             message += f"*{i}. {title}*\n"
             if summary:
                 message += f"{summary}\n"
-            message += f"_Quelle: {source}_\n"
             if link:
                 message += f"{link}\n"
             message += "\n──────────────\n\n"
-
-        # Fußzeile mit Quellenübersicht
-        sources = sorted({n.get('source', '').strip() for n in news_items if n.get('source')})
-        if sources:
-            message += f"_Quellen: {', '.join(sources)}_"
 
         # Telegram-Limit (4096 Zeichen) absichern
         if len(message) > 4096:
