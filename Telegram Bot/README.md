@@ -43,7 +43,7 @@ python telegram_bot.py
 - ✅ **Offizielle Quellen** (Tagesschau, n-tv, ZDF, DW, ARD)
 - ✅ **Politik-Filter** (nur relevante politische Themen)
 - ✅ **Duplikat-Entfernung** (keine doppelten Meldungen)
-- ✅ **Kompakte Formatierung** (Überschrift + 1 Satz)
+- ✅ **Kompakte Formatierung** (Überschrift + 1–2 Sätze ohne Emojis)
 - ✅ **JSON-Export** (für Archivierung)
 
 ## ⏰ Automatisierung:
