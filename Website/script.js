@@ -82,7 +82,6 @@ class NewsWebsite {
                 </div>
                 <p class="news-summary">${this.escapeHtml(news.summary)}</p>
                 <div class="news-meta">
-                    <span class="news-source">${this.escapeHtml(news.source)}</span>
                     <span class="news-time">
                         <i class="fas fa-clock"></i>
                         ${this.formatDate(news.published)}

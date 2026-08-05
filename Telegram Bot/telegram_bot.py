@@ -351,8 +351,7 @@ class NewsTelegramBot:
             return "*Keine politischen Nachrichten gefunden.*"
 
         date_str = datetime.now().strftime('%d.%m.%Y')
-        message = f"*Tagesnachrichten vom {date_str}*\n"
-        message += f"_Die wichtigsten politischen Meldungen des Tages – {len(news_items)} ausgewählt._\n\n"
+        message = f"*Tagesnachrichten vom {date_str}*\n\n"
 
         for i, news in enumerate(news_items, 1):
             title = self._escape_markdown(news.get('title', '').strip())
