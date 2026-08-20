@@ -278,13 +278,36 @@ class NewsTelegramBot:
         if not news_items:
             return " Keine politischen Nachrichten gefunden."
         
-        message = f" *Tagesnachrichten vom {datetime.now().strftime('%d.%m.%Y')}*\n\n"
-        
+        message = f"Tagesnachrichten vom {datetime.now().strftime('%d.%m.%Y')}\n\n"
+
         for i, news in enumerate(news_items, 1):
-            message += f"*{i}. {news['title']}*\n"
+            message += f"{i}. {news['title']}\n"
             message += f"{news['summary']}\n\n"
         
         return message
+
+    def send_news_text_to_telegram(self, news_items: List[Dict]) -> bool:
+        """Sendet die fünf Nachrichten zusätzlich als normalen Telegram-Text."""
+        try:
+            logger.info("Sende die fünf Nachrichten zusätzlich als normalen Text...")
+            url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+            response = requests.post(
+                url,
+                json={
+                    'chat_id': self.chat_id,
+                    'text': self.format_telegram_message(news_items),
+                },
+                timeout=60,
+            )
+            result = response.json()
+            if response.status_code == 200 and result.get('ok'):
+                logger.info("Die normale Textnachricht wurde erfolgreich gesendet")
+                return True
+            logger.error("Telegram Text API Error: %s", result.get('description', response.text))
+            return False
+        except Exception as e:
+            logger.error(f"Fehler beim Senden der normalen Textnachricht: {e}")
+            return False
 
     def send_news_image_to_telegram(self, news_items: List[Dict], png_path: Path) -> bool:
         """Sendet das eine gemeinsame Handschrift-PNG an Telegram."""
@@ -422,14 +445,19 @@ def main():
         png_path = render_handwriting_sheet(news)
         output_data['handwritten_png'] = str(png_path.name)
 
-        success = False
+        image_sent = False
+        text_sent = False
         if bot_token and chat_id:
-            success = bot.send_news_image_to_telegram(news, png_path)
+            # Erst das gemeinsame Handschriftblatt, danach die normale Textliste.
+            image_sent = bot.send_news_image_to_telegram(news, png_path)
+            text_sent = bot.send_news_text_to_telegram(news)
         else:
             logger.info("Telegram Senden übersprungen (keine Credentials)")
 
-        output_data['telegram_sent'] = success
-        
+        output_data['telegram_image_sent'] = image_sent
+        output_data['telegram_text_sent'] = text_sent
+        output_data['telegram_sent'] = image_sent and text_sent
+
         # JSON aktualisieren mit Sendestatus
         with open('daily_news.json', 'w', encoding='utf-8') as f:
             json.dump(output_data, f, ensure_ascii=False, indent=2)
