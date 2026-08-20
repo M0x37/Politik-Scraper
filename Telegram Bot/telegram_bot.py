@@ -10,12 +10,24 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime
 import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 from typing import List, Dict
 import logging
+
+import re
 import telegram
+
 from telegram import Bot
-import urllib.parse
-import webbrowser
+
+from dotenv import load_dotenv
+
+# Lädt Variablen aus der .env-Datei im Projektordner.
+# Bestehende Umgebungsvariablen haben Vorrang.
+load_dotenv()
 
 # Logging konfigurieren
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -58,54 +70,69 @@ class NewsTelegramBot:
             }
         ]
     
-    def is_political_news(self, title: str, summary: str, filter_keywords: List[str]) -> bool:
-        """Prüft ob eine Nachricht politisch relevant ist"""
-        if not title and not summary:
-            return False
-        
-        text = f"{title} {summary}".lower()
-        
-        political_keywords = [
-            'politik', 'regierung', 'bundestag', 'kanzler', 'minister', 'wahl', 'partei', 
-            'koalition', 'gesetz', 'parlament', 'abgeordnete', 'bund', 'länder',
-            'eu', 'european union', 'brüssel', 'merkel', 'scholz', 'baerbock',
-            'lindner', 'habeck', 'faeser', 'wissing', 'ampel', 'cdu', 'spd',
-            'grüne', 'fdp', 'afd', 'linke', 'bsw', 'friedrich merz',
-            'kabinett', 'kabinettssitzung', 'ministerpräsident', 'mp',
-            'opposition', 'regierungskoalition', 'koalitionsausschuss',
-            'bundestagswahl', 'landtagswahl', 'europawahl', 'kommunalwahl',
-            'gesetzgebung', 'bundestag', 'bundesrat', 'ausschuss',
-            'außenpolitik', 'innenpolitik', 'wirtschaftspolitik', 'sozialpolitik',
-            'klimapolitik', 'verteidigungspolitik', 'finanzpolitik',
-            'diplomatie', 'gipfel', 'konferenz', 'vertrag', 'abkommen',
-            'sanktionen', 'russland', 'ukraine', 'usa', 'china', 'nato',
-            'flüchtlinge', 'migration', 'asyl', 'grenze', 'integration'
-        ]
-        
-        all_keywords = political_keywords + filter_keywords
-        
-        for keyword in all_keywords:
-            if keyword.lower() in text:
+    def _contains_keyword(self, text: str, keywords: List[str]) -> bool:
+        """Prüft Keywords als ganze Wörter bzw. vollständige Phrasen."""
+        normalized = re.sub(r'\s+', ' ', text.casefold()).strip()
+        for keyword in keywords:
+            pattern = r'(?<!\w)' + re.escape(keyword.casefold()).replace(r'\ ', r'\s+') + r'(?!\w)'
+            if re.search(pattern, normalized):
                 return True
-        
-        non_political_keywords = [
-            'sport', 'fußball', 'bundesliga', 'champions league', 'fc bayern',
-            'borussia dortmund', 'formel 1', 'tennis', 'wimbledon', 'olympia',
-            'unterhaltung', 'film', 'musik', 'kino', 'serie', 'netflix',
-            'promi', 'celebrity', 'royal', 'könig', 'königin', 'prinz',
-            'wetter', 'unwetter', 'sturm', 'regen', 'schnee', 'hitze',
-            'rezepte', 'kochen', 'backen', 'essen', 'trinken',
-            'reise', 'urlaub', 'hotel', 'flug', 'ferien',
-            'gesundheit', 'krankheit', 'medizin', 'arzt', 'krankenhaus',
-            'tier', 'haustier', 'hund', 'katze', 'pferd'
-        ]
-        
-        for keyword in non_political_keywords:
-            if keyword.lower() in text:
-                return False
-        
         return False
-    
+
+    def is_political_news(self, title: str, summary: str, filter_keywords: List[str]) -> bool:
+        """Akzeptiert nur Nachrichten mit einem eindeutigen Politikbezug im Titel."""
+        if not title:
+            return False
+
+        political_keywords = [
+            'politik', 'regierung', 'bundesregierung', 'bundestag', 'bundesrat', 'kanzler',
+            'minister', 'ministerium', 'senator', 'senatorin', 'wahl', 'partei', 'koalition',
+            'gesetz', 'parlament',
+            'abgeordnete', 'brüssel', 'eu-kommission', 'eu-parlament', 'eu-rat',
+            'ungarn', 'orban', 'öffentlich-rechtlich', 'kampfjet', 'drohne',
+            'rumänien',
+            'europäische union', 'europawahl',
+            'bundestagswahl', 'landtagswahl', 'kommunalwahl', 'cdu', 'csu', 'spd',
+            'grüne', 'fdp', 'afd', 'linke', 'bsw', 'merz', 'scholz', 'baerbock',
+            'lindner', 'habeck', 'faeser', 'wissing', 'kabinett', 'opposition',
+            'ausschuss', 'außenpolitik', 'innenpolitik', 'wirtschaftspolitik',
+            'sozialpolitik', 'klimapolitik', 'verteidigungspolitik', 'finanzpolitik',
+            'sicherheitspolitik', 'diplomatie', 'gipfel', 'sanktionen', 'nato',
+            'migration', 'asyl', 'flüchtlinge', 'grenze', 'abkommen', 'vertrag',
+            'strafgerichtshof', 'internationaler strafgerichtshof', 'nord-stream',
+            'invasion', 'ukraine', 'russland'
+        ]
+        political_keywords.extend(filter_keywords)
+
+        non_political_keywords = [
+            'sport', 'fußball', 'bundesliga', 'champions league', 'formel 1', 'tennis',
+            'wimbledon', 'olympia', 'unterhaltung', 'film', 'musik', 'kino', 'netflix',
+            'promi', 'celebrity', 'wetter', 'unwetter', 'sturm', 'regen', 'schnee',
+            'rezepte', 'kochen', 'backen', 'reise', 'urlaub', 'hotel', 'flug', 'ferien',
+            'gesundheit', 'krankheit', 'medizin', 'arzt', 'krankenhaus', 'tier',
+            'haustier', 'hund', 'katze', 'pferd'
+        ]
+
+        title_has_politics = self._contains_keyword(title, political_keywords)
+
+        # Für die tägliche Ausgabe zählt der Titel. So werden zufällige Begriffe
+        # in RSS-Beschreibungen nicht dazu benutzt, Nicht-Politik einzuschleusen.
+        if not title_has_politics:
+            return False
+
+        # Offensichtliche Nicht-Politik-Themen bleiben ausgeschlossen, außer der
+        # Titel enthält zusätzlich einen starken politischen Begriff.
+        if self._contains_keyword(title, non_political_keywords):
+            strong_politics = [
+                'regierung', 'bundesregierung', 'bundestag', 'kanzler', 'minister',
+                'wahl', 'partei', 'koalition', 'gesetz', 'parlament', 'politik',
+                'abgeordnete', 'eu-kommission', 'eu-parlament'
+            ]
+            if not self._contains_keyword(title, strong_politics):
+                return False
+
+        return True
+
     def fetch_news_from_source(self, source: Dict) -> List[Dict]:
         """Holt Nachrichten von einer einzelnen Quelle"""
         try:
@@ -114,7 +141,8 @@ class NewsTelegramBot:
             feed = feedparser.parse(source['url'])
             news_items = []
             
-            for entry in feed.entries[:10]:
+            for entry in feed.entries[:20]:
+
                 try:
                     title = entry.title.strip()
                     link = entry.link
@@ -127,10 +155,13 @@ class NewsTelegramBot:
                     
                     if not summary and link:
                         summary = self.get_content_summary(link)
-                    
+
+                    # Titel und RSS-Kontext gemeinsam prüfen, damit relevante
+                    # politische Ereignisse nicht wegen eines neutralen Titels
+                    # verloren gehen.
                     if not self.is_political_news(title, summary, source.get('filter_keywords', [])):
                         continue
-                    
+
                     if summary:
                         summary = self.get_first_sentence(summary)
                     
@@ -254,64 +285,117 @@ class NewsTelegramBot:
             message += f"{news['summary']}\n\n"
         
         return message
-    
-    def open_in_converter(self, text: str) -> None:
-        """Öffnet den Text im Handschrift Converter"""
+
+    def send_news_image_to_telegram(self, news_items: List[Dict], png_path: Path) -> bool:
+        """Sendet das eine gemeinsame Handschrift-PNG an Telegram."""
         try:
-            encoded = urllib.parse.quote(text)
-            converter_url = f"https://sozi-zeta.vercel.app/?text={encoded}"
-            logger.info(f"Öffne Converter: {converter_url}")
-            webbrowser.open(converter_url)
-        except Exception as e:
-            logger.warning(f"Konnte Converter nicht öffnen: {e}")
-    
-    def send_news_to_telegram(self) -> bool:
-        """Sendet tägliche Nachrichten an Telegram"""
-        try:
-            logger.info("Sende tägliche Nachrichten an Telegram...")
-            
-            # Nachrichten holen
-            news = self.get_daily_news(5)
-            
-            # Nachricht formatieren
-            message = self.format_telegram_message(news)
-            
-            # Direkte API-Anfrage statt Bibliothek
-            import requests
-            
-            url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-            
-            data = {
-                'chat_id': self.chat_id,
-                'text': message,
-                'parse_mode': 'Markdown'
-            }
-            
-            response = requests.post(url, json=data, timeout=30)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('ok'):
-                    logger.info("Nachrichten erfolgreich an Telegram gesendet")
-                    return True
-                else:
-                    logger.error(f"API Error: {result.get('description')}")
-                    return False
-            else:
-                logger.error(f"HTTP Error: {response.status_code} - {response.text}")
-                return False
-            
-        except Exception as e:
-            logger.error(f"Fehler beim Senden an Telegram: {e}")
+            logger.info("Sende ein gemeinsames Nachrichtenblatt an Telegram...")
+            url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+            caption = f"Politik-Nachrichten vom {datetime.now().strftime('%d.%m.%Y')} – 5 Meldungen"
+
+            with png_path.open('rb') as image_file:
+                response = requests.post(
+                    url,
+                    data={'chat_id': self.chat_id, 'caption': caption},
+                    files={'photo': ('politik-nachrichten.png', image_file, 'image/png')},
+                    timeout=60,
+                )
+
+            result = response.json()
+            if response.status_code == 200 and result.get('ok'):
+                logger.info("Das eine Nachrichtenblatt wurde erfolgreich an Telegram gesendet")
+                return True
+
+            logger.error("Telegram API Error: %s", result.get('description', response.text))
             return False
+        except Exception as e:
+            logger.error(f"Fehler beim Senden des Nachrichtenblatts: {e}")
+            return False
+
+
+def build_handwriting_text(news_items: List[Dict]) -> str:
+    """Baut aus genau fünf Meldungen den gemeinsamen Text für ein Blatt."""
+    if len(news_items) != 5:
+        raise ValueError(f"Es werden genau 5 Nachrichten benötigt, erhalten: {len(news_items)}")
+
+    parts = [f"Politik-Nachrichten vom {datetime.now().strftime('%d.%m.%Y')}", ""]
+    for index, news in enumerate(news_items, 1):
+        parts.append(f"{index}. {news['title']}")
+        if news.get('summary'):
+            parts.append(news['summary'])
+        parts.append("")
+    return "\n".join(parts).strip() + "\n"
+
+
+def render_handwriting_sheet(news_items: List[Dict]) -> Path:
+    """Startet den integrierten Converter und exportiert genau eine PNG-Datei."""
+    project_root = Path(__file__).resolve().parents[1]
+    converter_dir = project_root / 'handwriting-converter'
+    renderer = converter_dir / 'render_sheet.cjs'
+    if not renderer.exists():
+        raise FileNotFoundError(f"Converter-Renderer fehlt: {renderer}")
+
+    npm_command = shutil.which('npm') or shutil.which('npm.cmd')
+    node_command = shutil.which('node')
+    if not npm_command or not node_command:
+        raise RuntimeError('Node.js und npm müssen installiert sein.')
+
+    output_path = project_root / 'daily_news_handwritten.png'
+    with tempfile.TemporaryDirectory(prefix='politik-news-') as temp_dir:
+        input_path = Path(temp_dir) / 'news.txt'
+        input_path.write_text(build_handwriting_text(news_items), encoding='utf-8')
+        port = os.getenv('HANDWRITING_PORT', '3000')
+        server = subprocess.Popen(
+            [npm_command, 'start', '--', '--port', port],
+            cwd=converter_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
+        try:
+            for _ in range(60):
+                try:
+                    requests.get(f'http://127.0.0.1:{port}', timeout=2)
+                    break
+                except requests.RequestException:
+                    import time
+                    time.sleep(1)
+            else:
+                raise RuntimeError('Der lokale Handwriting-Converter ist nicht gestartet.')
+
+            subprocess.run(
+                [node_command, str(renderer), str(input_path), str(output_path), port],
+                cwd=converter_dir,
+                check=True,
+            )
+        finally:
+            server.terminate()
+            try:
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                server.kill()
+
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        raise RuntimeError('Die gemeinsame PNG-Datei wurde nicht erzeugt.')
+    logger.info("Ein gemeinsames PNG erstellt: %s", output_path)
+    return output_path
 
 def main():
     """Hauptfunktion"""
-    bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-    chat_id = os.getenv('TELEGRAM_CHAT_ID')
+    bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
+    chat_id = os.getenv('TELEGRAM_CHAT_ID', '').strip()
 
-    if not bot_token or not chat_id:
-        logger.warning("TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID nicht gesetzt - nur Converter wird geöffnet")
+    missing = []
+    if not bot_token:
+        missing.append('TELEGRAM_BOT_TOKEN')
+    if not chat_id:
+        missing.append('TELEGRAM_CHAT_ID')
+
+    if missing:
+        logger.warning(
+            "Fehlende Umgebungsvariablen: %s. "
+            "Lege im Projektordner eine .env-Datei anhand von .env.example an.",
+            ', '.join(missing)
+        )
 
     bot = NewsTelegramBot(bot_token or '', chat_id or '')
     
@@ -331,19 +415,19 @@ def main():
         
         logger.info(f"JSON-Datei erstellt mit {len(news)} Nachrichten")
         
-        # Nachricht formatieren für Telegram UND Converter
-        message = bot.format_telegram_message(news)
-        
-        # Im Converter öffnen
-        bot.open_in_converter(message)
-        
-        # Nur an Telegram senden wenn Token und Chat ID vorhanden
+        if len(news) != 5:
+            raise RuntimeError(f"Es wurden nicht genau 5 Nachrichten gefunden: {len(news)}")
+
+        # Alle fünf Meldungen gemeinsam als ein Handschriftblatt rendern.
+        png_path = render_handwriting_sheet(news)
+        output_data['handwritten_png'] = str(png_path.name)
+
         success = False
         if bot_token and chat_id:
-            success = bot.send_news_to_telegram()
+            success = bot.send_news_image_to_telegram(news, png_path)
         else:
             logger.info("Telegram Senden übersprungen (keine Credentials)")
-        
+
         output_data['telegram_sent'] = success
         
         # JSON aktualisieren mit Sendestatus

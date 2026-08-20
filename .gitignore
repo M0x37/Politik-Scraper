@@ -47,6 +47,14 @@ daily_news.json
 .coverage
 htmlcov/
 
+# Node / converter
+node_modules/
+handwriting-converter/node_modules/
+handwriting-converter/build/
+
+# Generated handwriting sheet
+daily_news_handwritten.png
+
 # Environment variables
 .env
 .env.local

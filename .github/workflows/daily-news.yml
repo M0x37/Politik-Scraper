@@ -1,68 +1,77 @@
-name: Daily News Scraper
+name: Daily Politics Handwriting Sheet
 
 on:
   schedule:
-    # Täglich um 20:00 Berliner Zeit (19:00 UTC)
-    - cron: '0 19 * * *'
-  workflow_dispatch: # Erlaubt manuelle Ausführung
+    # 20:00 Berlin during summer time; GitHub Actions uses UTC.
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  scrape-news:
+  create-and-send-sheet:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Cache pip dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Run news scraper
-      id: scraper
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        python "Telegram Bot/telegram_bot.py" > telegram_output.txt 2>&1 || echo "Script failed" >> telegram_output.txt
-        echo "telegram_output<<EOF" >> $GITHUB_OUTPUT
-        cat telegram_output.txt >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-        
-    - name: Debug Telegram connection
-      if: failure()
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        cd src
-        python debug_telegram.py
-        
-    - name: Upload news data
-      uses: actions/upload-artifact@v4
-      with:
-        name: daily-news-${{ github.run_number }}
-        path: daily_news.json
-        retention-days: 30
-        
-    - name: Create summary
-      run: |
-        if [ -f "daily_news.json" ]; then
-          echo "## 📰 Tagesnachrichten" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          python -c "import json; data = json.load(open('daily_news.json', 'r', encoding='utf-8')); print(f'**Datum:** {data[\"date\"][:10]}'); print(f'**Anzahl Nachrichten:** {data[\"news_count\"]}'); print(''); [print(f'### {i}. {news[\"title\"]}\n{news[\"summary\"]}\n*Quelle: {news[\"source\"]}*\n') for i, news in enumerate(data['news'], 1)]" >> $GITHUB_STEP_SUMMARY
-        fi
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: handwriting-converter/package-lock.json
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Install converter dependencies
+        working-directory: handwriting-converter
+        run: npm ci
+
+      - name: Install Chromium for PNG rendering
+        working-directory: handwriting-converter
+        run: npx playwright install --with-deps chromium
+
+      - name: Fetch five politics news and send one PNG sheet
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python "Telegram Bot/telegram_bot.py"
+
+      - name: Upload generated sheet and news data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: politics-handwriting-${{ github.run_number }}
+          path: |
+            daily_news.json
+            daily_news_handwritten.png
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Add run summary
+        if: always()
+        run: |
+          if [ -f daily_news.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          data = json.loads(Path('daily_news.json').read_text(encoding='utf-8'))
+          print('## Politik-Handschriftblatt')
+          print(f"- Datum: {data.get('date', '')[:10]}")
+          print(f"- Nachrichten: {data.get('news_count', 0)}")
+          print(f"- Telegram gesendet: {data.get('telegram_sent', False)}")
+          print('- Ausgabe: eine gemeinsame PNG-Datei mit allen fünf Nachrichten')
+          for index, item in enumerate(data.get('news', []), 1):
+              print(f"  {index}. {item.get('title', '')}")
+          PY
+          fi
