@@ -2,8 +2,10 @@ name: Daily Politics Handwriting Sheet
 
 on:
   schedule:
-    # 20:00 Berlin during summer time; GitHub Actions uses UTC.
-    - cron: '0 18 * * *'
+    # GitHub Actions schedules use UTC. 06:00 UTC is 08:00 CEST and
+    # 07:00 UTC is 08:00 CET. The Berlin-time check below allows only
+    # the run that is actually at 08:00 local time to continue.
+    - cron: '0 6,7 * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,13 +19,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check Berlin execution time
+        id: berlin-time
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || "$(TZ=Europe/Berlin date +%H)" == "08" ]]; then
+            echo "run_bot=true" >> "$GITHUB_OUTPUT"
+            echo "Bot execution enabled at $(TZ=Europe/Berlin date '+%H:%M %Z')."
+          else
+            echo "run_bot=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping this UTC trigger; Berlin time is $(TZ=Europe/Berlin date '+%H:%M %Z')."
+          fi
+
       - name: Set up Python
+        if: steps.berlin-time.outputs.run_bot == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
 
       - name: Set up Node.js
+        if: steps.berlin-time.outputs.run_bot == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -31,24 +47,28 @@ jobs:
           cache-dependency-path: handwriting-converter/package-lock.json
 
       - name: Install Python dependencies
+        if: steps.berlin-time.outputs.run_bot == 'true'
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
 
       - name: Install converter dependencies
+        if: steps.berlin-time.outputs.run_bot == 'true'
         working-directory: handwriting-converter
         run: npm ci
 
       - name: Install Chromium for PNG rendering
+        if: steps.berlin-time.outputs.run_bot == 'true'
         working-directory: handwriting-converter
         run: npx playwright install --with-deps chromium
 
       - name: Fetch five politics news and send one PNG sheet
+        if: steps.berlin-time.outputs.run_bot == 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python "Telegram Bot/telegram_bot.py"
 
       - name: Upload generated sheet and news data
-        if: always()
+        if: always() && steps.berlin-time.outputs.run_bot == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: politics-handwriting-${{ github.run_number }}
@@ -59,7 +79,7 @@ jobs:
           retention-days: 30
 
       - name: Add run summary
-        if: always()
+        if: always() && steps.berlin-time.outputs.run_bot == 'true'
         run: |
           if [ -f daily_news.json ]; then
             python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
