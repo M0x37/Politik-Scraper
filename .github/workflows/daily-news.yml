@@ -60,7 +60,7 @@ jobs:
         working-directory: handwriting-converter
         run: npx playwright install --with-deps chromium
 
-      - name: Fetch five politics news and send one PNG sheet
+      - name: Fetch up to five politics news and send one PNG sheet
         if: steps.berlin-time.outputs.run_bot == 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -90,7 +90,7 @@ jobs:
           print(f"- Datum: {data.get('date', '')[:10]}")
           print(f"- Nachrichten: {data.get('news_count', 0)}")
           print(f"- Telegram gesendet: {data.get('telegram_sent', False)}")
-          print('- Ausgabe: eine gemeinsame PNG-Datei mit allen fünf Nachrichten')
+          print('- Ausgabe: eine gemeinsame PNG-Datei mit bis zu fünf Nachrichten')
           for index, item in enumerate(data.get('news', []), 1):
               print(f"  {index}. {item.get('title', '')}")
           PY

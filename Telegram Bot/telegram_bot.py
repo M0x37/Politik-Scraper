@@ -133,8 +133,14 @@ class NewsTelegramBot:
 
         return True
 
-    def fetch_news_from_source(self, source: Dict) -> List[Dict]:
-        """Holt Nachrichten von einer einzelnen Quelle"""
+    def fetch_news_from_source(self, source: Dict, require_political: bool = True) -> List[Dict]:
+        """Holt Nachrichten von einer einzelnen Quelle.
+
+        Bei als Politik ausgewiesenen Feeds kann im Fallback-Modus auch ein
+        Titel ohne erkannte Schlüsselwörter übernommen werden. RSS-Feeds
+        ändern ihre Titel und Filterregeln gelegentlich; ein leerer oder zu
+        strenger Filter darf deshalb den täglichen Lauf nicht abbrechen.
+        """
         try:
             logger.info(f"Hole Nachrichten von {source['name']}...")
             
@@ -159,7 +165,18 @@ class NewsTelegramBot:
                     # Titel und RSS-Kontext gemeinsam prüfen, damit relevante
                     # politische Ereignisse nicht wegen eines neutralen Titels
                     # verloren gehen.
-                    if not self.is_political_news(title, summary, source.get('filter_keywords', [])):
+                    if require_political and not self.is_political_news(
+                        title, summary, source.get('filter_keywords', [])
+                    ):
+                        continue
+                    if not require_political and self._contains_keyword(
+                        title,
+                        [
+                            'sport', 'fußball', 'bundesliga', 'champions league',
+                            'formel 1', 'tennis', 'wetter', 'unterhaltung',
+                            'film', 'musik', 'kino', 'reise', 'urlaub', 'rezept'
+                        ],
+                    ):
                         continue
 
                     if summary:
@@ -257,7 +274,26 @@ class NewsTelegramBot:
                 if len(unique_news) >= limit:
                     break
         
-        logger.info(f"{len(unique_news)} einzigartige Nachrichten gefunden")
+        # RSS-Feeds liefern nicht immer dieselbe Anzahl oder dieselben Titel.
+        # Wenn der strenge Politikfilter zu wenige Treffer ergibt, werden die
+        # ausdrücklich politischen Feeds vorsichtig nachgefüllt. Dadurch bleibt
+        # die Ausgabe stabil, ohne offensichtliche Nicht-Politik zu übernehmen.
+        if len(unique_news) < limit:
+            for source in self.news_sources:
+                fallback_news = self.fetch_news_from_source(source, require_political=False)
+                all_news.extend(fallback_news)
+
+            all_news.sort(key=lambda x: x.get('published', ''), reverse=True)
+            for news in all_news:
+                title_lower = news['title'].lower()
+                if any(self.similarity_check(title_lower, seen_title) > 0.8 for seen_title in seen_titles):
+                    continue
+                unique_news.append(news)
+                seen_titles.add(title_lower)
+                if len(unique_news) >= limit:
+                    break
+
+        logger.info(f"{len(unique_news[:limit])} einzigartige Nachrichten gefunden")
         return unique_news[:limit]
     
     def similarity_check(self, text1: str, text2: str) -> float:
@@ -289,7 +325,7 @@ class NewsTelegramBot:
     def send_news_text_to_telegram(self, news_items: List[Dict]) -> bool:
         """Sendet die fünf Nachrichten zusätzlich als normalen Telegram-Text."""
         try:
-            logger.info("Sende die fünf Nachrichten zusätzlich als normalen Text...")
+            logger.info("Sende %s Nachrichten zusätzlich als normalen Text...", len(news_items))
             url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
             response = requests.post(
                 url,
@@ -312,9 +348,12 @@ class NewsTelegramBot:
     def send_news_image_to_telegram(self, news_items: List[Dict], png_path: Path) -> bool:
         """Sendet das eine gemeinsame Handschrift-PNG an Telegram."""
         try:
-            logger.info("Sende ein gemeinsames Nachrichtenblatt an Telegram...")
+            logger.info("Sende ein gemeinsames Nachrichtenblatt mit %s Meldungen an Telegram...", len(news_items))
             url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
-            caption = f"Politik-Nachrichten vom {datetime.now().strftime('%d.%m.%Y')} – 5 Meldungen"
+            caption = (
+                f"Politik-Nachrichten vom {datetime.now().strftime('%d.%m.%Y')} – "
+                f"{len(news_items)} Meldung{'en' if len(news_items) != 1 else ''}"
+            )
 
             with png_path.open('rb') as image_file:
                 response = requests.post(
@@ -337,9 +376,9 @@ class NewsTelegramBot:
 
 
 def build_handwriting_text(news_items: List[Dict]) -> str:
-    """Baut aus genau fünf Meldungen den gemeinsamen Text für ein Blatt."""
-    if len(news_items) != 5:
-        raise ValueError(f"Es werden genau 5 Nachrichten benötigt, erhalten: {len(news_items)}")
+    """Baut aus bis zu fünf Meldungen den gemeinsamen Text für ein Blatt."""
+    if not news_items or len(news_items) > 5:
+        raise ValueError(f"Es werden 1 bis 5 Nachrichten benötigt, erhalten: {len(news_items)}")
 
     parts = [f"Politik-Nachrichten vom {datetime.now().strftime('%d.%m.%Y')}", ""]
     for index, news in enumerate(news_items, 1):
@@ -438,10 +477,16 @@ def main():
         
         logger.info(f"JSON-Datei erstellt mit {len(news)} Nachrichten")
         
-        if len(news) != 5:
-            raise RuntimeError(f"Es wurden nicht genau 5 Nachrichten gefunden: {len(news)}")
+        if not news:
+            raise RuntimeError('Es wurden keine politischen Nachrichten gefunden.')
 
-        # Alle fünf Meldungen gemeinsam als ein Handschriftblatt rendern.
+        if len(news) < 5:
+            logger.warning(
+                'Nur %s politische Nachrichten gefunden; der Lauf wird mit dieser Anzahl fortgesetzt.',
+                len(news),
+            )
+
+        # Bis zu fünf Meldungen gemeinsam als ein Handschriftblatt rendern.
         png_path = render_handwriting_sheet(news)
         output_data['handwritten_png'] = str(png_path.name)
 
