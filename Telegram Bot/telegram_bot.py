@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import List, Dict
 import logging
@@ -133,6 +134,36 @@ class NewsTelegramBot:
 
         return True
 
+    def _parse_feed_with_retries(self, url: str, attempts: int = 3):
+        """Lädt einen RSS-Feed mit Timeout und kurzen Wiederholungen."""
+        headers = {'User-Agent': 'Politik-Scraper/1.0 (+https://github.com/M0x37/Politik-Scraper)'}
+        last_error = None
+        for attempt in range(1, attempts + 1):
+            try:
+                response = requests.get(url, headers=headers, timeout=(10, 30))
+                if 400 <= response.status_code < 500:
+                    raise RuntimeError(
+                        f'RSS-Quelle nicht verfügbar (HTTP {response.status_code})'
+                    )
+                response.raise_for_status()
+                feed = feedparser.parse(response.content)
+                if getattr(feed, 'bozo', False) and not feed.entries:
+                    raise ValueError('RSS-Feed ist ungültig oder leer')
+                return feed
+            except Exception as error:
+                last_error = error
+                # Dauerhafte Client-Fehler (z. B. 404) werden nicht wiederholt.
+                if 'HTTP 4' in str(error):
+                    break
+                if attempt < attempts:
+                    wait_seconds = attempt * 2
+                    logger.warning(
+                        'RSS-Abruf fehlgeschlagen (%s/%s): %s; neuer Versuch in %ss',
+                        attempt, attempts, error, wait_seconds,
+                    )
+                    time.sleep(wait_seconds)
+        raise RuntimeError(f'RSS-Feed konnte nicht geladen werden: {last_error}')
+
     def fetch_news_from_source(self, source: Dict, require_political: bool = True) -> List[Dict]:
         """Holt Nachrichten von einer einzelnen Quelle.
 
@@ -144,7 +175,7 @@ class NewsTelegramBot:
         try:
             logger.info(f"Hole Nachrichten von {source['name']}...")
             
-            feed = feedparser.parse(source['url'])
+            feed = self._parse_feed_with_retries(source['url'])
             news_items = []
             
             for entry in feed.entries[:20]:
@@ -198,7 +229,7 @@ class NewsTelegramBot:
             return news_items
             
         except Exception as e:
-            logger.error(f"Fehler beim Abruf von {source['name']}: {e}")
+            logger.warning(f"Quelle {source['name']} nicht verfügbar; sie wird übersprungen: {e}")
             return []
     
     def get_content_summary(self, url: str) -> str:
@@ -207,9 +238,18 @@ class NewsTelegramBot:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            
+            response = None
+            for attempt in range(1, 4):
+                try:
+                    response = requests.get(url, headers=headers, timeout=(10, 30))
+                    response.raise_for_status()
+                    break
+                except requests.RequestException as error:
+                    if attempt == 3:
+                        raise
+                    logger.warning('Artikel-Abruf fehlgeschlagen (%s/3): %s', attempt, error)
+                    time.sleep(attempt * 2)
+
             soup = BeautifulSoup(response.content, 'html.parser')
             
             content_selectors = [
@@ -415,11 +455,15 @@ def render_handwriting_sheet(news_items: List[Dict]) -> Path:
         )
         try:
             for _ in range(60):
+                if server.poll() is not None:
+                    raise RuntimeError(
+                        f'Handwriting-Converter wurde vor dem Start beendet (Exit-Code {server.returncode}).'
+                    )
                 try:
-                    requests.get(f'http://127.0.0.1:{port}', timeout=2)
-                    break
+                    response = requests.get(f'http://127.0.0.1:{port}', timeout=2)
+                    if response.ok:
+                        break
                 except requests.RequestException:
-                    import time
                     time.sleep(1)
             else:
                 raise RuntimeError('Der lokale Handwriting-Converter ist nicht gestartet.')
@@ -428,6 +472,7 @@ def render_handwriting_sheet(news_items: List[Dict]) -> Path:
                 [node_command, str(renderer), str(input_path), str(output_path), port],
                 cwd=converter_dir,
                 check=True,
+                timeout=120,
             )
         finally:
             server.terminate()
@@ -442,86 +487,91 @@ def render_handwriting_sheet(news_items: List[Dict]) -> Path:
     return output_path
 
 def main():
-    """Hauptfunktion"""
+    """Hauptfunktion mit fehlertoleranter Verarbeitung der einzelnen Stufen."""
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
     chat_id = os.getenv('TELEGRAM_CHAT_ID', '').strip()
+    errors = []
+    news = []
+    output_data = {
+        'date': datetime.now().isoformat(),
+        'news_count': 0,
+        'news': [],
+        'status': 'degraded',
+        'telegram_image_sent': False,
+        'telegram_text_sent': False,
+        'telegram_sent': False,
+        'errors': errors,
+    }
 
-    missing = []
-    if not bot_token:
-        missing.append('TELEGRAM_BOT_TOKEN')
-    if not chat_id:
-        missing.append('TELEGRAM_CHAT_ID')
-
+    missing = [name for name, value in (
+        ('TELEGRAM_BOT_TOKEN', bot_token),
+        ('TELEGRAM_CHAT_ID', chat_id),
+    ) if not value]
     if missing:
-        logger.warning(
-            "Fehlende Umgebungsvariablen: %s. "
-            "Lege im Projektordner eine .env-Datei anhand von .env.example an.",
-            ', '.join(missing)
-        )
+        message = f"Fehlende Umgebungsvariablen: {', '.join(missing)}"
+        logger.warning('%s. Telegram-Versand wird übersprungen.', message)
+        errors.append(message)
 
-    bot = NewsTelegramBot(bot_token or '', chat_id or '')
-    
+    bot = NewsTelegramBot(bot_token, chat_id)
+
     try:
-        # Nachrichten holen (unabhängig vom Senden)
-        news = bot.get_daily_news(5)
-        
-        # Immer JSON erstellen
-        output_data = {
-            'date': datetime.now().isoformat(),
-            'news_count': len(news),
-            'news': news
-        }
-        
-        with open('daily_news.json', 'w', encoding='utf-8') as f:
-            json.dump(output_data, f, ensure_ascii=False, indent=2)
-        
-        logger.info(f"JSON-Datei erstellt mit {len(news)} Nachrichten")
-        
+        try:
+            news = bot.get_daily_news(5)
+        except Exception as error:
+            message = f'Nachrichtenabruf fehlgeschlagen: {error}'
+            logger.error(message)
+            errors.append(message)
+
+        output_data.update({'news_count': len(news), 'news': news})
         if not news:
-            raise RuntimeError('Es wurden keine politischen Nachrichten gefunden.')
+            message = 'Keine politischen Nachrichten gefunden; dieser Lauf wird ohne Versand beendet.'
+            logger.warning(message)
+            errors.append(message)
+            with open('daily_news.json', 'w', encoding='utf-8') as file:
+                json.dump(output_data, file, ensure_ascii=False, indent=2)
+            return
 
         if len(news) < 5:
-            logger.warning(
-                'Nur %s politische Nachrichten gefunden; der Lauf wird mit dieser Anzahl fortgesetzt.',
-                len(news),
-            )
+            logger.warning('Nur %s politische Nachrichten gefunden; der Lauf wird fortgesetzt.', len(news))
 
-        # Bis zu fünf Meldungen gemeinsam als ein Handschriftblatt rendern.
-        png_path = render_handwriting_sheet(news)
-        output_data['handwritten_png'] = str(png_path.name)
+        try:
+            png_path = render_handwriting_sheet(news)
+            output_data['handwritten_png'] = str(png_path.name)
+        except Exception as error:
+            message = f'Handschriftblatt konnte nicht erstellt werden: {error}'
+            logger.error(message)
+            errors.append(message)
 
-        image_sent = False
-        text_sent = False
         if bot_token and chat_id:
-            # Erst das gemeinsame Handschriftblatt, danach die normale Textliste.
-            image_sent = bot.send_news_image_to_telegram(news, png_path)
-            text_sent = bot.send_news_text_to_telegram(news)
+            if output_data.get('handwritten_png'):
+                output_data['telegram_image_sent'] = bot.send_news_image_to_telegram(news, png_path)
+                if not output_data['telegram_image_sent']:
+                    errors.append('Telegram-Bild konnte nicht gesendet werden.')
+            output_data['telegram_text_sent'] = bot.send_news_text_to_telegram(news)
+            if not output_data['telegram_text_sent']:
+                errors.append('Telegram-Text konnte nicht gesendet werden.')
         else:
-            logger.info("Telegram Senden übersprungen (keine Credentials)")
+            logger.info('Telegram-Versand übersprungen (keine Credentials)')
 
-        output_data['telegram_image_sent'] = image_sent
-        output_data['telegram_text_sent'] = text_sent
-        output_data['telegram_sent'] = image_sent and text_sent
-
-        # JSON aktualisieren mit Sendestatus
-        with open('daily_news.json', 'w', encoding='utf-8') as f:
-            json.dump(output_data, f, ensure_ascii=False, indent=2)
-        
-        logger.info("Telegram Bot Ausführung abgeschlossen")
-        
-    except Exception as e:
-        logger.error(f"Fehler bei der Bot-Ausführung: {e}")
-        # Auch bei Fehler JSON erstellen
-        error_data = {
-            'date': datetime.now().isoformat(),
-            'news_count': 0,
-            'news': [],
-            'telegram_sent': False,
-            'error': str(e)
-        }
-        with open('daily_news.json', 'w', encoding='utf-8') as f:
-            json.dump(error_data, f, ensure_ascii=False, indent=2)
-        raise
+        output_data['telegram_sent'] = (
+            output_data['telegram_image_sent'] and output_data['telegram_text_sent']
+        )
+        output_data['status'] = 'ok' if not errors else 'degraded'
+        with open('daily_news.json', 'w', encoding='utf-8') as file:
+            json.dump(output_data, file, ensure_ascii=False, indent=2)
+        logger.info('Telegram-Bot-Ausführung abgeschlossen mit Status: %s', output_data['status'])
+    except Exception as error:
+        # Unerwartete Fehler werden dokumentiert, aber nicht als unlesbarer Traceback
+        # an GitHub Actions weitergereicht. So bleiben JSON und Artefakte erhalten.
+        message = f'Unerwarteter Fehler: {error}'
+        logger.error(message)
+        errors.append(message)
+        output_data.update({'news_count': len(news), 'news': news, 'status': 'degraded'})
+        try:
+            with open('daily_news.json', 'w', encoding='utf-8') as file:
+                json.dump(output_data, file, ensure_ascii=False, indent=2)
+        except OSError:
+            logger.error('Fehler beim Schreiben von daily_news.json')
 
 if __name__ == "__main__":
     main()

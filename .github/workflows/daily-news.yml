@@ -89,7 +89,11 @@ jobs:
           print('## Politik-Handschriftblatt')
           print(f"- Datum: {data.get('date', '')[:10]}")
           print(f"- Nachrichten: {data.get('news_count', 0)}")
+          print(f"- Status: {data.get('status', 'unknown')}")
           print(f"- Telegram gesendet: {data.get('telegram_sent', False)}")
+          print(f"- Behandelte Hinweise/Fehler: {len(data.get('errors', []))}")
+          for error in data.get('errors', []):
+              print(f"  - {error}")
           print('- Ausgabe: eine gemeinsame PNG-Datei mit bis zu fünf Nachrichten')
           for index, item in enumerate(data.get('news', []), 1):
               print(f"  {index}. {item.get('title', '')}")
