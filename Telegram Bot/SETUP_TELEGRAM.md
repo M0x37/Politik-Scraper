@@ -32,11 +32,11 @@ Deine Chat ID (Zahl)
 ### Lokal testen:
 ```bash
 # Umgebungsvariablen setzen
-set TELEGRAM_BOT_TOKEN=dein_bot_token
-set TELEGRAM_CHAT_ID=deine_chat_id
+export TELEGRAM_BOT_TOKEN=dein_bot_token
+export TELEGRAM_CHAT_ID=deine_chat_id
 
 # Bot ausführen
-cd src
+cd "Telegram Bot"
 python telegram_bot.py
 ```
 
@@ -47,7 +47,7 @@ python telegram_bot.py
 
 ## 4. Automatisierung
 
-Nach erfolgreichem Test läuft der Bot automatisch täglich um 20:00 Berlin Zeit und sendet die 5 wichtigsten politischen Nachrichten.
+Nach erfolgreichem Test läuft der Bot automatisch täglich um 20:00 Berliner Zeit und sendet die 5 wichtigsten politischen Nachrichten. GitHub Actions löst dafür um 18:00 und 19:00 UTC aus und führt wegen der Sommer-/Winterzeitprüfung genau einen Lauf aus.
 
 ## 5. Bot anpassen
 
@@ -63,7 +63,7 @@ news = self.get_daily_news(10)  # Statt 5 Nachrichten
 In `.github/workflows/daily-news.yml` den Cron-Job anpassen:
 ```yaml
 schedule:
-  - cron: '0 19 * * *'  # 20:00 Berlin Zeit
+  - cron: '0 18,19 * * *'  # 20:00 Berlin Zeit (Sommer/Winter)
 ```
 
 ## 6. Fehlersuche

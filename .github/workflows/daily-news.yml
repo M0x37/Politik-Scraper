@@ -2,14 +2,18 @@ name: Daily Politics Handwriting Sheet
 
 on:
   schedule:
-    # GitHub Actions schedules use UTC. 06:00 UTC is 08:00 CEST and
-    # 07:00 UTC is 08:00 CET. The Berlin-time check below allows only
-    # the run that is actually at 08:00 local time to continue.
-    - cron: '0 6,7 * * *'
+    # GitHub Actions schedules use UTC. 18:00 UTC is 20:00 CEST and
+    # 19:00 UTC is 20:00 CET. The Berlin-time check below allows only
+    # the run that is actually at 20:00 local time to continue.
+    - cron: '0 18,19 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: daily-politics-news
+  cancel-in-progress: false
 
 jobs:
   create-and-send-sheet:
@@ -23,7 +27,7 @@ jobs:
         id: berlin-time
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" || "$(TZ=Europe/Berlin date +%H)" == "08" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || "$(TZ=Europe/Berlin date +%H)" == "20" ]]; then
             echo "run_bot=true" >> "$GITHUB_OUTPUT"
             echo "Bot execution enabled at $(TZ=Europe/Berlin date '+%H:%M %Z')."
           else

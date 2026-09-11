@@ -358,7 +358,11 @@ class NewsTelegramBot:
 
         for i, news in enumerate(news_items, 1):
             message += f"{i}. {news['title']}\n"
-            message += f"{news['summary']}\n\n"
+            if news.get('summary'):
+                message += f"{news['summary']}\n"
+            if news.get('link'):
+                message += f"{news['link']}\n"
+            message += "\n"
         
         return message
 
@@ -553,9 +557,9 @@ def main():
         else:
             logger.info('Telegram-Versand übersprungen (keine Credentials)')
 
-        output_data['telegram_sent'] = (
-            output_data['telegram_image_sent'] and output_data['telegram_text_sent']
-        )
+        # Der Text ist der verlässliche Pflichtversand. Das Bild ist ein
+        # optionales Extra, da Chromium/der Renderer in CI ausfallen kann.
+        output_data['telegram_sent'] = output_data['telegram_text_sent']
         output_data['status'] = 'ok' if not errors else 'degraded'
         with open('daily_news.json', 'w', encoding='utf-8') as file:
             json.dump(output_data, file, ensure_ascii=False, indent=2)
